@@ -134,8 +134,8 @@ int main()
         }
     }
 
-   
-    //Invaders[1]--;
+    Invaders[1]--; //wiem ze to nie ma sensu ale juz probowalem co sie dalo
+    
     
     //inicjalizacja pomiaru czasu
     auto t1000 = high_resolution_clock::now();
@@ -144,6 +144,7 @@ int main()
     auto elapsed_time_1000 = duration_cast<chrono::milliseconds>(tnow - t1000).count();
     auto elapsed_time_100 = duration_cast<chrono::milliseconds>(tnow - t100).count();
    
+    
     //glowna petla gry
     while (Game.get_state() == TRUE) {
         //pomiar czasu
