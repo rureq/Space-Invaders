@@ -134,7 +134,7 @@ int main()
         }
     }
 
-    Invaders[1]--; //wiem ze to nie ma sensu ale juz probowalem co sie dalo
+    Invaders[1]--; //wiem ze to nie ma sensu ale juz probowalem co sie dalo, jak sie wykomentuje to mozna latac statkiem na boki :)
     
     
     //inicjalizacja pomiaru czasu
@@ -196,6 +196,9 @@ int main()
         if (key == KEY_LEFT && Hero.PosX>0) {
             Hero.PosX -= 1;
         }
+
+        //wystrzelenie pocisku
+        
         
     }
     
