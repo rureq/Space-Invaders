@@ -29,6 +29,11 @@ class Character{
  public:
     Character(int a, int b, int c) : PosX(a), PosY(b), HP(c) {}
     virtual void display() = 0;
+    virtual void move() = 0;
+
+    void operator-- (int) {
+        HP=0;
+    }
 
     double PosX;
     double PosY;
@@ -42,8 +47,10 @@ private:
 class Player : public Character{
 public:
     Player(int a, int b,int c) : Character(a, b, c) {}
+    virtual void move() {}
 
-    void display() {
+
+    virtual void display() {
         gotoxy(PosX, PosY);
         cout << "^";
         
@@ -57,16 +64,31 @@ private:
 class Enemy : public Character{
 public:
     Enemy(int a, int b, int c) : Character(a,b,c) {}
-    void operator-- () {
-        HP = 0;
-    }
+    virtual void move() {}
      
-    void display() {
+    virtual void display() {
         if (HP == 1) {
             gotoxy(PosX, PosY);
             cout << "W";
         }
     }
+
+};
+
+class Bullet : public Character {
+public:
+    Bullet(int a, int b, int c, int d) : Character(a, b, c), dir(d) {}
+
+    virtual void display() {
+        gotoxy(PosX, PosY);
+            cout << "o";
+    }
+    virtual void move() {
+        PosY += dir;
+    }
+
+    int dir;
+
 
 };
 
@@ -87,6 +109,7 @@ public:
     int EnemyCount;
     int FirstPosX;
     int FirstPosY;
+
    
 private:
     int FPS = 50;
@@ -95,14 +118,27 @@ private:
    
 };
 
-void redraw(vector <Character*> A, Player B) {
+void redraw(vector <Character*> &A, Player &B, vector<Character*> &C) {
     system("cls");
+    
     auto it = A.begin();
+    
+    
     for (it; it != A.end(); it++) {
         (*it)->display();
     }
+    
     B.display();
-    gotoxy(0, 0);
+    
+    if (C.size() != 0) {
+        for (auto it2 = C.begin(); it2 != C.end(); it2++) {
+            gotoxy((*it2)->PosX, (*it2)->PosY);
+            (*it2)->display();
+        }
+    }
+    
+    
+      
 }
 
 
@@ -114,17 +150,21 @@ int main()
     RECT r;
     GetWindowRect(console, &r);
     MoveWindow(console, r.left, r.top, 800, 600, TRUE);
-    
-   
-   
-    
+          
     //inicjalizacja zmienych gry - dac do klasy zeby sie nie dalo zmieniac xd
     int key = 0;
     GameHandler Game;
     int move = 0;
     int dir = 1;
+    bool space_trig = 0;
+    bool space_trig_prev = 0;
+    bool crt_bullet = 0;
     //inicjalizacja gracza
     Player Hero(47,28,10);
+
+    //inicjalizacja wektora pocisków
+    vector<Character*> Bullets;
+    auto it_Bullets = Bullets.begin();
 
     //inicjalizacja przeciwnikow
     vector<Character*> Invaders;
@@ -134,15 +174,21 @@ int main()
         }
     }
 
-    Invaders[1]--; //wiem ze to nie ma sensu ale juz probowalem co sie dalo, jak sie wykomentuje to mozna latac statkiem na boki :)
+    auto it = Invaders.begin();
+
+    //(*Invaders[0])--; //wiem ze to nie ma sensu ale juz probowalem co sie dalo, jak sie wykomentuje to mozna latac statkiem na boki :)
     
     
     //inicjalizacja pomiaru czasu
+    auto tnow = high_resolution_clock::now();
+
     auto t1000 = high_resolution_clock::now();
     auto t100 = high_resolution_clock::now();
-    auto tnow = high_resolution_clock::now();
+    auto t50 = high_resolution_clock::now();
+    
     auto elapsed_time_1000 = duration_cast<chrono::milliseconds>(tnow - t1000).count();
     auto elapsed_time_100 = duration_cast<chrono::milliseconds>(tnow - t100).count();
+    auto elapsed_time_50 = duration_cast<chrono::milliseconds>(tnow - t50).count();
    
     
     //glowna petla gry
@@ -151,6 +197,7 @@ int main()
         tnow = high_resolution_clock::now();
         elapsed_time_1000 = duration_cast<chrono::milliseconds>(tnow - t1000).count();
         elapsed_time_100 = duration_cast<chrono::milliseconds>(tnow - t100).count();
+        elapsed_time_50 = duration_cast<chrono::milliseconds>(tnow - t50).count();
         key = 0;
 
         //jesli w buforze klawiatury znajduja sie dane, odczytaj jaki klawisz wcisnieto
@@ -166,7 +213,7 @@ int main()
 
         //przesuwanie wrogów
         if (elapsed_time_1000 >= 1000) {
-            auto it = Invaders.begin();
+            it = Invaders.begin();
             for (it; it != Invaders.end(); it++) {
                 (*it)->PosX+=dir;
                
@@ -182,12 +229,7 @@ int main()
                 }
             }
         }
-        //zapewnienie FPS
-        if (elapsed_time_100 >= 50) {
-            redraw(Invaders, Hero);
-            t100 = high_resolution_clock::now();
-
-        }
+       
         
         //przesuwanie gracza
         if (key == KEY_RIGHT && Hero.PosX<94) {
@@ -198,8 +240,76 @@ int main()
         }
 
         //wystrzelenie pocisku
+        space_trig = 0;
+
+        if (key == KEY_SPACE) {
+            space_trig = 1;            
+        }
+        else {
+            space_trig = 0;
+        }
+
+        if (space_trig == 1 && space_trig_prev == 0) {
+            t50 = high_resolution_clock::now();     
+            crt_bullet = 1;
+        }
+
+        space_trig_prev = space_trig;
+
+        if (elapsed_time_50 >= 50 && crt_bullet == 1) {
+            Bullets.push_back(new Bullet(Hero.PosX,Hero.PosY-1,1,-1));
+            crt_bullet = 0;
+        }
+
+        //przesuwanie pocisków
         
-        
+        //wykrywanie kolizji i wyjechania za ekran
+        if (Bullets.size() != 0) {
+            for (auto iter = Invaders.begin(); iter != Invaders.end(); iter++) {
+                for (auto iter2 = Bullets.begin(); iter2 != Bullets.end(); ) {
+                    if ((*iter)->PosX == (*iter2)->PosX && (*iter)->PosY == (*iter2)->PosY)  {
+                        //(*Invaders[iter])--;
+                        (**iter)--;//tutaj
+                        iter2 = Bullets.erase(iter2);
+                        
+                    }
+                    else
+                        ++iter2;
+                }
+
+            }
+        }
+
+        //wykrywanie wyjechania za ekran
+        if (Bullets.size() != 0) {
+            for (auto iter2 = Bullets.begin(); iter2 != Bullets.end(); ) {
+                if ((*iter2)->PosY == 0 || (*iter2)->PosY > 30) {
+                    iter2 = Bullets.erase(iter2);
+                }
+                else
+                    ++iter2;
+            }
+        }
+
+        //zrzucanie bomby losowo
+
+        //punkty
+
+        //game over
+
+        //zapewnienie FPS i przesuwania pocisków
+        if (elapsed_time_100 >= 50 ) {
+            if (Bullets.size() != 0) {
+                it_Bullets = Bullets.begin();
+                for (it_Bullets; it_Bullets != Bullets.end(); it_Bullets++) {
+                    (*it_Bullets)->move();
+                }
+            }
+            
+            redraw(Invaders, Hero, Bullets);
+            t100 = high_resolution_clock::now();
+
+        }
     }
     
 }
