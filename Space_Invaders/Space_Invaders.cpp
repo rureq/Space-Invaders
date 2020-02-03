@@ -12,8 +12,7 @@
 #include <conio.h>
 #include <vector>
 #include <functional>
-
-
+#include <cstdlib>
 
 using namespace std;
 using namespace chrono;
@@ -32,33 +31,25 @@ class Character{
     virtual void move() = 0;
 
     void operator-- (int) {
-        HP=0;
+        HP-=1;
     }
 
     double PosX;
     double PosY;
     int HP;
-        
-private:
-    
-    
 };
 
 class Player : public Character{
 public:
-    Player(int a, int b,int c) : Character(a, b, c) {}
+    Player(int a, int b,int c) : Character(a, b, c), points(0) {}
     virtual void move() {}
-
+    int points;
 
     virtual void display() {
         gotoxy(PosX, PosY);
         cout << "^";
         
     }
-
-private:
-    double velocity = 800;
-
 };
 
 class Enemy : public Character{
@@ -95,7 +86,6 @@ public:
 
 class GameHandler{
 
-//pauza gry, koniec gry itd, wyswietlanie gry
 public:
     GameHandler() :state(1), EnemyCountX(8), EnemyCountY(4), FirstPosX(4), FirstPosY(2) {}
     bool get_state() {
@@ -104,17 +94,22 @@ public:
     void set_state(BOOL a) {
         state = a;
     }
-    int EnemyCountX;
-    int EnemyCountY;
-    int EnemyCount;
-    int FirstPosX;
-    int FirstPosY;
+    void game_over() {
+    
+    
+    }
+
+
+    //zmienne
+    int EnemyCountX; //liczba wrogów na kierunku poziomym
+    int EnemyCountY; //liczba wrogów na kierunku pionowym
+    int EnemyCount; //liczba wszystkich wrogów
+    int FirstPosX; //pozycja pierwszego wroga na kierunku poziomym (lewy górny róg)
+    int FirstPosY; //pozycja pierwszego wroga na kierunku pionowym (lewy górny róg)
 
    
 private:
-    int FPS = 50;
     bool state;
-    int Key;
    
 };
 
@@ -136,9 +131,6 @@ void redraw(vector <Character*> &A, Player &B, vector<Character*> &C) {
             (*it2)->display();
         }
     }
-    
-    
-      
 }
 
 
@@ -159,8 +151,11 @@ int main()
     bool space_trig = 0;
     bool space_trig_prev = 0;
     bool crt_bullet = 0;
+    int rand_counter = 0;
+    int random_select = 0;
+
     //inicjalizacja gracza
-    Player Hero(47,28,10);
+    Player Hero(47,28,4);
 
     //inicjalizacja wektora pocisków
     vector<Character*> Bullets;
@@ -176,9 +171,6 @@ int main()
 
     auto it = Invaders.begin();
 
-    //(*Invaders[0])--; //wiem ze to nie ma sensu ale juz probowalem co sie dalo, jak sie wykomentuje to mozna latac statkiem na boki :)
-    
-    
     //inicjalizacja pomiaru czasu
     auto tnow = high_resolution_clock::now();
 
@@ -190,6 +182,9 @@ int main()
     auto elapsed_time_100 = duration_cast<chrono::milliseconds>(tnow - t100).count();
     auto elapsed_time_50 = duration_cast<chrono::milliseconds>(tnow - t50).count();
    
+    srand(time(nullptr));
+    int random = rand();
+    
     
     //glowna petla gry
     while (Game.get_state() == TRUE) {
@@ -212,7 +207,7 @@ int main()
         }
 
         //przesuwanie wrogów
-        if (elapsed_time_1000 >= 1000) {
+        if (elapsed_time_1000 >= 300) {
             it = Invaders.begin();
             for (it; it != Invaders.end(); it++) {
                 (*it)->PosX+=dir;
@@ -228,7 +223,29 @@ int main()
                     (*it)->PosX += dir;
                 }
             }
+            //zrzucanie bomby losowo
+        
+       
+            random = rand()%(Game.EnemyCountX*Game.EnemyCountY) + 1;
+            if (Invaders[random-1]->HP == 1) {
+                int xd = Game.EnemyCountY - modulus <int>()(random, Game.EnemyCountY);
+                
+                for (int a = 0; a <= xd; a++) {
+                    
+                    if (random<=32){
+                        if (Invaders[random-1]->HP == 1) {
+                            random_select = random-1;
+                        }
+                    }
+                    random++;
+                    
+                }
+                Bullets.push_back(new Bullet(Invaders[random_select]->PosX, Invaders[random_select]->PosY+1, 1, 1));
+            }
+
         }
+        
+        //}
        
         
         //przesuwanie gracza
@@ -261,22 +278,37 @@ int main()
             crt_bullet = 0;
         }
 
-        //przesuwanie pocisków
         
-        //wykrywanie kolizji i wyjechania za ekran
+        
+        //wykrywanie kolizji kosmitów z pociskami
         if (Bullets.size() != 0) {
             for (auto iter = Invaders.begin(); iter != Invaders.end(); iter++) {
                 for (auto iter2 = Bullets.begin(); iter2 != Bullets.end(); ) {
-                    if ((*iter)->PosX == (*iter2)->PosX && (*iter)->PosY == (*iter2)->PosY)  {
-                        //(*Invaders[iter])--;
-                        (**iter)--;//tutaj
-                        iter2 = Bullets.erase(iter2);
+                    if ((*iter)->PosX == (*iter2)->PosX && (*iter)->PosY == (*iter2)->PosY && (*iter)->HP > 0){
                         
+                            (**iter)--;
+                            Hero.points++;
+                            iter2 = Bullets.erase(iter2);
                     }
                     else
                         ++iter2;
                 }
 
+            }
+        }
+
+        //wykrywanie kolizji gracza z pociskami
+        if (Bullets.size() != 0) {
+            for (auto iter2 = Bullets.begin(); iter2 != Bullets.end(); ) {
+                if (Hero.PosX == (*iter2)->PosX && Hero.PosY == (*iter2)->PosY) {
+
+                    Hero--;
+                    
+                    
+                    iter2 = Bullets.erase(iter2);
+                }
+                else
+                    ++iter2;
             }
         }
 
@@ -291,11 +323,9 @@ int main()
             }
         }
 
-        //zrzucanie bomby losowo
-
-        //punkty
-
-        //game over
+        
+        
+        
 
         //zapewnienie FPS i przesuwania pocisków
         if (elapsed_time_100 >= 50 ) {
@@ -307,8 +337,30 @@ int main()
             }
             
             redraw(Invaders, Hero, Bullets);
+            gotoxy(0, 0);
+            cout << Hero.HP;
+            gotoxy(44, 0);
+            cout << Hero.points;
             t100 = high_resolution_clock::now();
 
+        }
+
+        //sprawdzenie pozycji najniższego wroga
+        int max = 0;
+        for (auto it2 = Invaders.begin(); it2 != Invaders.end(); it2++) {
+            if ((*it2)->HP == 1 && (*it2)->PosY > max) {
+                max = (*it2)->PosY;
+
+            }
+        }
+
+        //koniec gry
+        if (Hero.HP == 0 || max == Hero.PosY) {
+            system("cls");
+            gotoxy(30, 10);
+            cout << "GAME OVER"<<endl<<endl<<endl<<endl<<endl;
+            Game.set_state(0);
+            system("pause");
         }
     }
     
